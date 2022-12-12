@@ -461,12 +461,6 @@ def main(argv):
   else:
     num_predictions_per_model = FLAGS.nstruct
     data_pipeline = monomer_data_pipeline
-  if 1:
-    pass
-  else:
-    pass
-  
-
   model_runners = {}
   model_names = config.MODEL_PRESETS[FLAGS.model_preset]
   #BW
