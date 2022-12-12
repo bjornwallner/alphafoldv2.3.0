@@ -466,7 +466,7 @@ def main(argv):
   #BW
   if FLAGS.models_to_use:
     model_names =[m for m in model_names if m in FLAGS.models_to_use]
-   if len(model_names)==0:
+  if len(model_names)==0:
     raise ValueError(f'No models to run: {FLAGS.models_to_use} is not in {config.MODEL_PRESETS[FLAGS.model_preset]}')
   
   for model_name in model_names:
