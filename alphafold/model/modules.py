@@ -524,7 +524,7 @@ class Transition(hk.Module):
         self.global_config.subbatch_size,
         batched_args=[act],
         nonbatched_args=[],
-        low_memory=not is_training)
+        low_memory=True) #BW stay low_memory even if dropout is used at inference, not is_training)
 
     return act
 
