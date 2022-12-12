@@ -494,7 +494,9 @@ def main(argv):
     model_params = data.get_model_haiku_params(
         model_name=model_name, data_dir=FLAGS.data_dir)
     model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
+    print(num_predictions_per_model)
     for i in range(num_predictions_per_model):
+      print(f'{model_name}_{i}')
       model_runners[f'{model_name}_{i}'] = model_runner
       #model_runners[f'{model_name}_pred_{i}'] = model_runner
 
