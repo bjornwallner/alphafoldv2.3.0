@@ -468,38 +468,29 @@ def main(argv):
     model_config = config.model_config(model_name)
     if run_multimer_system:
       model_config.model.num_ensemble_eval = num_ensemble
+      if FLAGS.max_recycles != 3: #Not default, it will set it otherwise it is 20 from config.py file.
+        model_config.model.num_recycle = FLAGS.max_recycles
+        model_config.model.recycle_early_stop_tolerance=FLAGS.early_stop_tolerence #0.5
     else:
       model_config.data.eval.num_ensemble = num_ensemble
-
-  if FLAGS.dropout:
-    #dropout set is_training to True and during training models can be assembled. Here num_ensemble will always be 1 though. But unless this variable is set the program will crash.
-    model_config.model.num_ensemble_train = num_ensemble
-    if not FLAGS.dropout_structure_module:
-      model_config.model.heads.structure_module.dropout=0.0
-
-  if run_multimer_system:
-    if FLAGS.max_recycles != 3: #Not default, it will set it otherwise it is 20 from config.py file.
+      logging.info(f'Setting max_recycles to {FLAGS.max_recycles}')
       model_config.model.num_recycle = FLAGS.max_recycles
+      model_config.data.common.num_recycle = FLAGS.max_recycles
+        
+    if FLAGS.dropout:
+    #dropout set is_training to True and during training models can be assembled. Here num_ensemble will always be 1 though. But unless this variable is set the program will crash.
+      model_config.model.num_ensemble_train = num_ensemble
+      if not FLAGS.dropout_structure_module:
+        model_config.model.heads.structure_module.dropout=0.0
 
-      
-    model_config.model.recycle_early_stop_tolerance=FLAGS.early_stop_tolerence #0.5
-  else:
-    logging.info(f'Setting max_recycles to {FLAGS.max_recycles}')
-    model_config.model.num_recycle = FLAGS.max_recycles
-    model_config.data.common.num_recycle = FLAGS.max_recycles
-
-
-
-
-
-  model_params = data.get_model_haiku_params(
+    model_params = data.get_model_haiku_params(
     model_name=model_name, data_dir=data_dir) #BW FLAGS.data_dir)
-  model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
-  #print(num_predictions_per_model)
-  for i in range(FLAGS.nstruct_start,num_predictions_per_model+1):
+    model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
+      #print(num_predictions_per_model)
+    for i in range(FLAGS.nstruct_start,num_predictions_per_model+1):
   #for i in range(num_predictions_per_model):
     #print(f'{model_name}_{i}')
-    model_runners[f'{model_name}_{i}'] = model_runner
+      model_runners[f'{model_name}_{i}'] = model_runner
     #model_runners[f'{model_name}_pred_{i}'] = model_runner
 
   logging.info('Have %d models: %s', len(model_runners),
