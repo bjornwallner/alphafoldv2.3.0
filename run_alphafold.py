@@ -457,11 +457,12 @@ def main(argv):
   model_runners = {}
   model_names = config.MODEL_PRESETS[FLAGS.model_preset]
   #BW
+  print(model_names)
   if FLAGS.models_to_use:
     model_names =[m for m in model_names if m in FLAGS.models_to_use]
   if len(model_names)==0:
     raise ValueError(f'No models to run: {FLAGS.models_to_use} is not in {config.MODEL_PRESETS[FLAGS.model_preset]}')
-  
+  print(model_names)
   for model_name in model_names:
     model_config = config.model_config(model_name)
     if run_multimer_system:
