@@ -124,6 +124,8 @@ class DataPipeline:
                use_small_bfd: bool,
                mgnify_max_hits: int = 501,
                uniref_max_hits: int = 10000,
+               input_msa: str = None,
+               no_templates: bool = False,
                use_precomputed_msas: bool = False):
     """Initializes the data pipeline."""
     self._use_small_bfd = use_small_bfd
@@ -145,6 +147,8 @@ class DataPipeline:
     self.template_featurizer = template_featurizer
     self.mgnify_max_hits = mgnify_max_hits
     self.uniref_max_hits = uniref_max_hits
+    self.input_msa=input_msa
+    self.no_templates=no_templates
     self.use_precomputed_msas = use_precomputed_msas
 
   def process(self, input_fasta_path: str, msa_output_dir: str) -> FeatureDict:
@@ -181,19 +185,28 @@ class DataPipeline:
     msa_for_templates = parsers.remove_empty_columns_from_stockholm_msa(
         msa_for_templates)
 
-    if self.template_searcher.input_format == 'sto':
-      pdb_templates_result = self.template_searcher.query(msa_for_templates)
-    elif self.template_searcher.input_format == 'a3m':
-      uniref90_msa_as_a3m = parsers.convert_stockholm_to_a3m(msa_for_templates)
-      pdb_templates_result = self.template_searcher.query(uniref90_msa_as_a3m)
-    else:
-      raise ValueError('Unrecognized template input format: '
-                       f'{self.template_searcher.input_format}')
-
     pdb_hits_out_path = os.path.join(
         msa_output_dir, f'pdb_hits.{self.template_searcher.output_format}')
-    with open(pdb_hits_out_path, 'w') as f:
-      f.write(pdb_templates_result)
+    if os.path.exists(pdb_hits_out_path):
+      logging.info(f'Reading {pdb_hits_out_path}')
+      with open(pdb_hits_out_path, 'r') as f:
+        pdb_templates_result=f.read()
+    else:
+      
+
+      if self.template_searcher.input_format == 'sto':
+        pdb_templates_result = self.template_searcher.query(msa_for_templates)
+      elif self.template_searcher.input_format == 'a3m':
+        uniref90_msa_as_a3m = parsers.convert_stockholm_to_a3m(msa_for_templates)
+        pdb_templates_result = self.template_searcher.query(uniref90_msa_as_a3m)
+      else:
+        raise ValueError('Unrecognized template input format: '
+                       f'{self.template_searcher.input_format}')
+
+      #pdb_hits_out_path = os.path.join(
+      #    msa_output_dir, f'pdb_hits.{self.template_searcher.output_format}')
+      with open(pdb_hits_out_path, 'w') as f:
+        f.write(pdb_templates_result)
 
     uniref90_msa = parsers.parse_stockholm(jackhmmer_uniref90_result['sto'])
     mgnify_msa = parsers.parse_stockholm(jackhmmer_mgnify_result['sto'])
@@ -220,6 +233,11 @@ class DataPipeline:
           use_precomputed_msas=self.use_precomputed_msas)
       bfd_msa = parsers.parse_a3m(hhblits_bfd_uniref_result['a3m'])
 
+    #BW
+    if self.no_templates:
+      logging.info('Using no template information at all')
+      pdb_template_hits=[]
+ 
     templates_result = self.template_featurizer.get_templates(
         query_sequence=input_sequence,
         hits=pdb_template_hits)
@@ -229,7 +247,20 @@ class DataPipeline:
         description=input_description,
         num_res=num_res)
 
-    msa_features = make_msa_features((uniref90_msa, bfd_msa, mgnify_msa))
+    #BW
+    if self.input_msa:
+      logging.info(f'Reading MSA from {self.input_msa}') 
+      if os.path.exists(self.input_msa):
+        with open(self.input_msa) as f:
+          user_msa=parsers.parse_stockholm(f.read())
+          msa_features=make_msa_features((user_msa,))
+          logging.info(f'{self.input_msa} MSA size: {len(user_msa)}')
+      else:
+        raise FileNotFoundError(f'--input_msa file {self.input_msa} not found')
+    else:      
+      msa_features = make_msa_features((uniref90_msa, bfd_msa, mgnify_msa))
+      
+    #msa_features = make_msa_features((uniref90_msa, bfd_msa, mgnify_msa))
 
     logging.info('Uniref90 MSA size: %d sequences.', len(uniref90_msa))
     logging.info('BFD MSA size: %d sequences.', len(bfd_msa))

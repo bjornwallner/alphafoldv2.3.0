@@ -43,6 +43,35 @@ import numpy as np
 
 logging.set_verbosity(logging.INFO)
 
+
+
+alphafold_path = os.path.dirname(os.path.realpath(__file__))
+#Default: look in the alphafold path for the alphafold_data folder (or symmlink)
+data_dir = alphafold_path + "/alphafold_data"
+#data_dir =    #set it to the location of the alphafold_data or make a symmlink in the folder of this script.
+if not os.path.exists(data_dir):
+  print(f'data_dir={data_dir}')
+  print(f'Set the data_dir in {__file__} to the location of "alphafold_data" or make a symmlink to it in the {alphafold_path} folder')
+  sys.exit(1)
+
+DOWNLOAD_DIR= data_dir
+uniprot_database_path = os.path.join(
+    DOWNLOAD_DIR, 'uniprot',    'uniprot.fasta')
+uniref90_database_path = os.path.join(
+    DOWNLOAD_DIR, 'uniref90', 'uniref90.fasta')
+mgnify_database_path = os.path.join(
+    DOWNLOAD_DIR, 'mgnify', 'mgy_clusters.fa')
+small_bfd_database_path = os.path.join(
+    DOWNLOAD_DIR, 'small_bfd',    'bfd-first_non_consensus_sequences.fasta')
+bfd_database_path = os.path.join(
+    DOWNLOAD_DIR, 'bfd',    'bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt')
+uniclust30_database_path = os.path.join(
+    DOWNLOAD_DIR, 'uniclust30', 'UniRef30_2021_06', 'UniRef30_2021_06')
+pdb70_database_path = os.path.join(DOWNLOAD_DIR, 'pdb70', 'pdb70')
+template_mmcif_dir = os.path.join(DOWNLOAD_DIR, 'pdb_mmcif', 'mmcif_files')
+obsolete_pdbs_path = os.path.join(DOWNLOAD_DIR, 'pdb_mmcif', 'obsolete.dat')
+pdb_seqres_database_path=os.path.join(DOWNLOAD_DIR, 'pdb_seqres', 'pdb_seqres.txt')
+
 flags.DEFINE_list(
     'fasta_paths', None, 'Paths to FASTA files, each containing a prediction '
     'target that will be folded one after another. If a FASTA file contains '
@@ -50,7 +79,7 @@ flags.DEFINE_list(
     'separated by commas. All FASTA paths must have a unique basename as the '
     'basename is used to name the output directories for each prediction.')
 
-flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
+#flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
                     'store the results.')
 flags.DEFINE_string('jackhmmer_binary_path', shutil.which('jackhmmer'),
@@ -65,9 +94,9 @@ flags.DEFINE_string('hmmbuild_binary_path', shutil.which('hmmbuild'),
                     'Path to the hmmbuild executable.')
 flags.DEFINE_string('kalign_binary_path', shutil.which('kalign'),
                     'Path to the Kalign executable.')
-flags.DEFINE_string('uniref90_database_path', None, 'Path to the Uniref90 '
+flags.DEFINE_string('uniref90_database_path', uniref90_database_path, 'Path to the Uniref90 '
                     'database for use by JackHMMER.')
-flags.DEFINE_string('mgnify_database_path', None, 'Path to the MGnify '
+flags.DEFINE_string('mgnify_database_path', mgnify_database_path, 'Path to the MGnify '
                     'database for use by JackHMMER.')
 flags.DEFINE_string('bfd_database_path', None, 'Path to the BFD '
                     'database for use by HHblits.')
@@ -81,11 +110,11 @@ flags.DEFINE_string('pdb70_database_path', None, 'Path to the PDB70 '
                     'database for use by HHsearch.')
 flags.DEFINE_string('pdb_seqres_database_path', None, 'Path to the PDB '
                     'seqres database for use by hmmsearch.')
-flags.DEFINE_string('template_mmcif_dir', None, 'Path to a directory with '
+flags.DEFINE_string('template_mmcif_dir', template_mmcif_dir, 'Path to a directory with '
                     'template mmCIF structures, each named <pdb_id>.cif')
-flags.DEFINE_string('max_template_date', None, 'Maximum template release date '
+flags.DEFINE_string('max_template_date', '2050-01-01', 'Maximum template release date '
                     'to consider. Important if folding historical test sets.')
-flags.DEFINE_string('obsolete_pdbs_path', None, 'Path to file containing a '
+flags.DEFINE_string('obsolete_pdbs_path', obsolete_pdbs_path, 'Path to file containing a '
                     'mapping from obsolete PDB IDs to the PDB IDs of their '
                     'replacements.')
 flags.DEFINE_enum('db_preset', 'full_dbs',
@@ -93,11 +122,11 @@ flags.DEFINE_enum('db_preset', 'full_dbs',
                   'Choose preset MSA database configuration - '
                   'smaller genetic database config (reduced_dbs) or '
                   'full genetic database config  (full_dbs)')
-flags.DEFINE_enum('model_preset', 'monomer',
-                  ['monomer', 'monomer_casp14', 'monomer_ptm', 'multimer'],
+flags.DEFINE_enum('model_preset', 'monomer',config.MODEL_PRESETS.keys(), #presets are defined in the config/BW
+                  #['monomer', 'monomer_casp14', 'monomer_ptm', 'multimer','multimer_v1','multimer_v2','multimer_all'],
                   'Choose preset model configuration - the monomer model, '
                   'the monomer model with extra ensembling, monomer model with '
-                  'pTM head, or multimer model')
+                  'pTM head, multimer model (v2), or specify which of the multimer models to use _v1, _v2, or _all')
 flags.DEFINE_boolean('benchmark', False, 'Run multiple JAX model evaluations '
                      'to obtain a timing that excludes the compilation time, '
                      'which should be more indicative of the time required for '
@@ -112,22 +141,50 @@ flags.DEFINE_integer('num_multimer_predictions_per_model', 5, 'How many '
                      'generated per model. E.g. if this is 2 and there are 5 '
                      'models then there will be 10 predictions per input. '
                      'Note: this FLAG only applies if model_preset=multimer')
-flags.DEFINE_boolean('use_precomputed_msas', False, 'Whether to read MSAs that '
+flags.DEFINE_integer('nstruct', 1, 'How many '
+                     'predictions (each with a different random seed) will be '
+                     'generated per model. E.g. if this is 2 and there are 5 '
+                     'models then there will be 10 predictions per input. ')
+flags.DEFINE_integer('nstruct_start',1, 'model to start with, can be used to parallelize jobs, '
+                     'e.g --nstruct 20 --nstruct_start 20 will only make model _20'
+                     'e.g --nstruct 21 --nstruct_start 20 will make model _20 and _21 etc.')
+flags.DEFINE_boolean('use_precomputed_msas', True, 'Whether to read MSAs that ' #default changed to True /BW
                      'have been written to disk instead of running the MSA '
                      'tools. The MSA files are looked up in the output '
                      'directory, so it must stay the same between multiple '
                      'runs that are to reuse the MSAs. WARNING: This will not '
                      'check if the sequence, database or configuration have '
                      'changed.')
-flags.DEFINE_boolean('run_relax', True, 'Whether to run the final relaxation '
-                     'step on the predicted models. Turning relax off might '
-                     'result in predictions with distracting stereochemical '
+flags.DEFINE_string('input_msa',None,'Input msa to use instead of the default')
+flags.DEFINE_boolean('no_templates',False, 'will not use any template, will be faster than filter by date')
+flags.DEFINE_boolean('seq_only', False, 'exist after seq search')
+flags.DEFINE_integer('max_recycles', 3,'Max recycles')
+flags.DEFINE_float('early_stop_tolerence', 0.5,'early stopping threshold')
+flags.DEFINE_boolean('use_precomputed_msas', True, 'Whether to read MSAs that '
+                     'have been written to disk instead of running the MSA '
+                     'tools. The MSA files are looked up in the output '
+                     'directory, so it must stay the same between multiple '
+                     'runs that are to reuse the MSAs. WARNING: This will not '
+                     'check if the sequence, database or configuration have '
+                     'changed.')
+flags.DEFINE_boolean('run_relax', False, 'Whether to run the final relaxation ' #default changed to False to save time/BW
+                     'step on the predicted models. Turning relax off might '   #use the run_relax_from_results_pkl.py to
+                     'result in predictions with distracting stereochemical '   #run relax for particular models.
                      'violations but might help in case you are having issues '
                      'with the relaxation stage.')
 flags.DEFINE_boolean('use_gpu_relax', None, 'Whether to relax on GPU. '
                      'Relax on GPU can be much faster than CPU, so it is '
                      'recommended to enable if possible. GPUs must be available'
                      ' if this setting is enabled.')
+flags.DEFINE_boolean('dropout',False,'Turn on drop out during inference to get more diversity')
+flags.DEFINE_boolean('dropout_structure_module',True, 'Dropout in structure module at inference')
+flags.DEFINE_boolean('output_all_results',False,'Output original results pickle (LARGE..'
+                     'only recommended if you really know you need any of the following:'
+                     'experimentally_resolved, masked_msa,aligned_confidence_probs')
+flags.DEFINE_list('models_to_use',None, 'specify which models in model_preset that should be run')
+
+
+
 
 FLAGS = flags.FLAGS
 
@@ -167,13 +224,17 @@ def predict_structure(
   if not os.path.exists(msa_output_dir):
     os.makedirs(msa_output_dir)
 
+
   # Get features.
   t_0 = time.time()
   feature_dict = data_pipeline.process(
       input_fasta_path=fasta_path,
       msa_output_dir=msa_output_dir)
   timings['features'] = time.time() - t_0
-
+  #BW
+  if FLAGS.seq_only:
+    logging.info('Exiting since --seq_only is True... ')
+    sys.exit()
   # Write out features as a pickled dictionary.
   features_output_path = os.path.join(output_dir, 'features.pkl')
   with open(features_output_path, 'wb') as f:
@@ -188,6 +249,11 @@ def predict_structure(
   num_models = len(model_runners)
   for model_index, (model_name, model_runner) in enumerate(
       model_runners.items()):
+    #BW
+    unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
+    if os.path.exists(unrelaxed_pdb_path):
+        logging.info(f'{unrelaxed_pdb_path} already exists')
+        continue
     logging.info('Running model %s on %s', model_name, fasta_name)
     t_0 = time.time()
     model_random_seed = model_index + random_seed * num_models
@@ -219,8 +285,29 @@ def predict_structure(
 
     # Save the model outputs.
     result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
-    with open(result_output_path, 'wb') as f:
-      pickle.dump(prediction_result, f, protocol=4)
+
+    #BW
+    if FLAGS.output_all_results:
+      with open(result_output_path, 'wb') as f:
+        pickle.dump(prediction_result, f, protocol=4)
+    else:
+      #      keys_to_remove=['distogram', 'experimentally_resolved', 'masked_msa','aligned_confidence_probs']
+      keys_to_remove=['experimentally_resolved', 'masked_msa','aligned_confidence_probs']
+      d={}
+      for k in prediction_result.keys():
+        if k not in keys_to_remove:
+          d[k]=prediction_result[k]
+      with open(result_output_path, 'wb') as f:
+        pickle.dump(d, f, protocol=4)
+            
+    # Save the scores in json
+    d={}
+    for k in ['plldt','ptm','iptm','ranking_confidence']:
+      if k in prediction_result:
+        d[k]=float(prediction_result[k])
+    with open(result_output_path + '.json', 'w') as f:
+      json.dump(d,f)
+      
 
     # Add the predicted LDDT in the b-factor column.
     # Note that higher predicted LDDT value means higher model confidence.
@@ -233,7 +320,8 @@ def predict_structure(
         remove_leading_feature_dimension=not model_runner.multimer_mode)
 
     unrelaxed_pdbs[model_name] = protein.to_pdb(unrelaxed_protein)
-    unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
+    # BW: Already defined above to allow checkpointing
+    #    unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
     with open(unrelaxed_pdb_path, 'w') as f:
       f.write(unrelaxed_pdbs[model_name])
 
@@ -267,7 +355,7 @@ def predict_structure(
         f.write(relaxed_pdbs[model_name])
       else:
         f.write(unrelaxed_pdbs[model_name])
-
+  os.system(f'bzip2 -f {output_dir}/ranked*pdb')
   ranking_output_path = os.path.join(output_dir, 'ranking_debug.json')
   with open(ranking_output_path, 'w') as f:
     label = 'iptm+ptm' if 'iptm' in prediction_result else 'plddts'
@@ -355,33 +443,72 @@ def main(argv):
       small_bfd_database_path=FLAGS.small_bfd_database_path,
       template_searcher=template_searcher,
       template_featurizer=template_featurizer,
+      no_templates=FLAGS.no_templates,
       use_small_bfd=use_small_bfd,
+      input_msa=FLAGS.input_msa,
       use_precomputed_msas=FLAGS.use_precomputed_msas)
 
   if run_multimer_system:
-    num_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+#    num_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+    #BW keep the default flag, while nstruct is prefered.
+    num_predictions_per_model = max(FLAGS.nstruct,FLAGS.num_multimer_predictions_per_model)
+    
     data_pipeline = pipeline_multimer.DataPipeline(
         monomer_data_pipeline=monomer_data_pipeline,
         jackhmmer_binary_path=FLAGS.jackhmmer_binary_path,
         uniprot_database_path=FLAGS.uniprot_database_path,
         use_precomputed_msas=FLAGS.use_precomputed_msas)
   else:
-    num_predictions_per_model = 1
+    num_predictions_per_model = FLAGS.nstruct
     data_pipeline = monomer_data_pipeline
+  if 1:
+    pass
+  else:
+    pass
+  
 
   model_runners = {}
   model_names = config.MODEL_PRESETS[FLAGS.model_preset]
+  #BW
+  if FLAGS.models_to_use:
+    model_names =[m for m in model_names if m in FLAGS.models_to_use]
+   if len(model_names)==0:
+    raise ValueError(f'No models to run: {FLAGS.models_to_use} is not in {config.MODEL_PRESETS[FLAGS.model_preset]}')
+  
   for model_name in model_names:
     model_config = config.model_config(model_name)
     if run_multimer_system:
       model_config.model.num_ensemble_eval = num_ensemble
     else:
       model_config.data.eval.num_ensemble = num_ensemble
+
+  if FLAGS.dropout:
+    #dropout set is_training to True and during training models can be assembled. Here num_ensemble will always be 1 though. But unless this variable is set the program will crash.
+    model_config.model.num_ensemble_train = num_ensemble
+    if not FLAGS.dropout_structure_module:
+      model_config.model.heads.structure_module.dropout=0.0
+
+  if run_multimer_system:
+    if FLAGS.max_recycles != 3: #Not default, it will set it otherwise it is 20 from config.py file.
+      model_config.model.num_recycle = FLAGS.max_recycles
+
+      
+    model_config.model.recycle_early_stop_tolerance=FLAGS.early_stop_tolerence #0.5
+  else:
+    logging.info(f'Setting max_recycles to {FLAGS.max_recycles}')
+    model_config.model.num_recycle = FLAGS.max_recycles
+    model_config.data.common.num_recycle = FLAGS.max_recycles
+
+
+
+
+
     model_params = data.get_model_haiku_params(
         model_name=model_name, data_dir=FLAGS.data_dir)
-    model_runner = model.RunModel(model_config, model_params)
+    model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
     for i in range(num_predictions_per_model):
-      model_runners[f'{model_name}_pred_{i}'] = model_runner
+      model_runners[f'{model_name}_{i}'] = model_runner
+      #model_runners[f'{model_name}_pred_{i}'] = model_runner
 
   logging.info('Have %d models: %s', len(model_runners),
                list(model_runners.keys()))
@@ -420,13 +547,13 @@ if __name__ == '__main__':
   flags.mark_flags_as_required([
       'fasta_paths',
       'output_dir',
-      'data_dir',
-      'uniref90_database_path',
-      'mgnify_database_path',
-      'template_mmcif_dir',
-      'max_template_date',
-      'obsolete_pdbs_path',
-      'use_gpu_relax',
+ #     'data_dir',
+ #     'uniref90_database_path',
+ #     'mgnify_database_path',
+ #     'template_mmcif_dir',
+ #     'max_template_date',
+ #     'obsolete_pdbs_path',
+ #     'use_gpu_relax',
   ])
 
   app.run(main)
