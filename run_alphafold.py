@@ -241,7 +241,7 @@ def predict_structure(
   # Run the models.
   num_models = len(model_runners)
   for model_index, (model_name, model_runner) in enumerate(
-      sorted(model_runners.items(),key=lambda x:int(x[1].split('_')[-1]))):
+      sorted(model_runners.items(),key=lambda x:int(x[0].split('_')[-1]))):
     #BW
     unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
     if os.path.exists(unrelaxed_pdb_path):
