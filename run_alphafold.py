@@ -160,13 +160,6 @@ flags.DEFINE_boolean('no_templates',False, 'will not use any template, will be f
 flags.DEFINE_boolean('seq_only', False, 'exist after seq search')
 flags.DEFINE_integer('max_recycles', 3,'Max recycles')
 flags.DEFINE_float('early_stop_tolerence', 0.5,'early stopping threshold')
-flags.DEFINE_boolean('use_precomputed_msas', True, 'Whether to read MSAs that '
-                     'have been written to disk instead of running the MSA '
-                     'tools. The MSA files are looked up in the output '
-                     'directory, so it must stay the same between multiple '
-                     'runs that are to reuse the MSAs. WARNING: This will not '
-                     'check if the sequence, database or configuration have '
-                     'changed.')
 flags.DEFINE_boolean('run_relax', False, 'Whether to run the final relaxation ' #default changed to False to save time/BW
                      'step on the predicted models. Turning relax off might '   #use the run_relax_from_results_pkl.py to
                      'result in predictions with distracting stereochemical '   #run relax for particular models.
