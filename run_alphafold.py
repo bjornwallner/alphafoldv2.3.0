@@ -241,7 +241,7 @@ def predict_structure(
   # Run the models.
   num_models = len(model_runners)
   for model_index, (model_name, model_runner) in enumerate(
-      model_runners.items()):
+      sorted(model_runners.items(),key=lamda x:int(x.split('_')[-1])):
     #BW
     unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
     if os.path.exists(unrelaxed_pdb_path):
@@ -465,6 +465,7 @@ def main(argv):
     raise ValueError(f'No models to run: {FLAGS.models_to_use} is not in {config.MODEL_PRESETS[FLAGS.model_preset]}')
   print(model_names)
   for model_name in model_names:
+    
     model_config = config.model_config(model_name)
     if run_multimer_system:
       model_config.model.num_ensemble_eval = num_ensemble
@@ -486,12 +487,9 @@ def main(argv):
     model_params = data.get_model_haiku_params(
     model_name=model_name, data_dir=data_dir) #BW FLAGS.data_dir)
     model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
-      #print(num_predictions_per_model)
     for i in range(FLAGS.nstruct_start,num_predictions_per_model+1):
-  #for i in range(num_predictions_per_model):
-    #print(f'{model_name}_{i}')
       model_runners[f'{model_name}_{i}'] = model_runner
-    #model_runners[f'{model_name}_pred_{i}'] = model_runner
+      #model_runners[f'{model_name}_pred_{i}'] = model_runner
 
   logging.info('Have %d models: %s', len(model_runners),
                list(model_runners.keys()))
