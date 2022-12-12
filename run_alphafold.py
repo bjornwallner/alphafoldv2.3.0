@@ -456,8 +456,9 @@ def main(argv):
     data_pipeline = monomer_data_pipeline
   model_runners = {}
   model_names = config.MODEL_PRESETS[FLAGS.model_preset]
-  #BW
   print(model_names)
+  #BW
+ # print(model_names)
   if FLAGS.models_to_use:
     model_names =[m for m in model_names if m in FLAGS.models_to_use]
   if len(model_names)==0:
@@ -495,7 +496,8 @@ def main(argv):
     model_name=model_name, data_dir=data_dir) #BW FLAGS.data_dir)
   model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
   #print(num_predictions_per_model)
-  for i in range(num_predictions_per_model):
+  for i in range(FLAGS.nstruct_start,num_predictions_per_model+1):
+  #for i in range(num_predictions_per_model):
     #print(f'{model_name}_{i}')
     model_runners[f'{model_name}_{i}'] = model_runner
     #model_runners[f'{model_name}_pred_{i}'] = model_runner
