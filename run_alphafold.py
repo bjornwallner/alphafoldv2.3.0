@@ -492,7 +492,7 @@ def main(argv):
 
 
   model_params = data.get_model_haiku_params(
-    model_name=model_name, data_dir=FLAGS.data_dir)
+    model_name=model_name, data_dir=data_dir) #BW FLAGS.data_dir)
   model_runner = model.RunModel(model_config, model_params,is_training=FLAGS.dropout)
   #print(num_predictions_per_model)
   for i in range(num_predictions_per_model):
